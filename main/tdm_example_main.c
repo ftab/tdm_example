@@ -22,8 +22,20 @@
 #endif
 
 #define SAMPLE_RATE     (44100)
+
 #define CHANNEL_NUM     (8)
+
+#if CHANNEL_NUM == 4
+#define CHANNEL_MASK    (I2S_TDM_ACTIVE_CH0 | I2S_TDM_ACTIVE_CH1 | I2S_TDM_ACTIVE_CH2 | I2S_TDM_ACTIVE_CH3)
+#elif CHANNEL_NUM == 8
 #define CHANNEL_MASK    (I2S_TDM_ACTIVE_CH0 | I2S_TDM_ACTIVE_CH1 | I2S_TDM_ACTIVE_CH2 | I2S_TDM_ACTIVE_CH3 | I2S_TDM_ACTIVE_CH4 | I2S_TDM_ACTIVE_CH5 | I2S_TDM_ACTIVE_CH6 | I2S_TDM_ACTIVE_CH7)
+#elif CHANNEL_NUM == 16
+#define CHANNEL_MASK    (I2S_TDM_ACTIVE_CH0 | I2S_TDM_ACTIVE_CH1 | I2S_TDM_ACTIVE_CH2 | I2S_TDM_ACTIVE_CH3 | I2S_TDM_ACTIVE_CH4 | I2S_TDM_ACTIVE_CH5 | I2S_TDM_ACTIVE_CH6 | I2S_TDM_ACTIVE_CH7 | \
+                         I2S_TDM_ACTIVE_CH8 | I2S_TDM_ACTIVE_CH9 | I2S_TDM_ACTIVE_CH10 | I2S_TDM_ACTIVE_CH11 | I2S_TDM_ACTIVE_CH12 | I2S_TDM_ACTIVE_CH13 | I2S_TDM_ACTIVE_CH14 | I2S_TDM_ACTIVE_CH15)
+#else
+#error Channel numbers supported: 4, 8, 16
+#endif
+
 #define I2S_NUM         (0)
 #define WAVE_FREQ_HZ    (100)
 #define PI              (3.14159265)
@@ -60,24 +72,48 @@ static void setup_triangle_sine_waves(int bits)
         if (bits == 24) { //1-bytes unused
             samples_data[i*CHANNEL_NUM] = ((int) triangle_float) << 8;
             samples_data[i*CHANNEL_NUM + 1] = ((int) sin_float) << 8;
-#if CHANNEL_NUM == 8
+#if CHANNEL_NUM > 2
             samples_data[i*CHANNEL_NUM + 2] = ((int) triangle_float) << 8;
             samples_data[i*CHANNEL_NUM + 3] = ((int) sin_float) << 8;
+#endif
+#if CHANNEL_NUM > 4
             samples_data[i*CHANNEL_NUM + 4] = ((int) triangle_float) << 8;
             samples_data[i*CHANNEL_NUM + 5] = ((int) sin_float) << 8;
             samples_data[i*CHANNEL_NUM + 6] = ((int) triangle_float) << 8;
             samples_data[i*CHANNEL_NUM + 7] = ((int) sin_float) << 8;
 #endif
+#if CHANNEL_NUM > 8
+            samples_data[i*CHANNEL_NUM + 8] = ((int) triangle_float) << 8;
+            samples_data[i*CHANNEL_NUM + 9] = ((int) sin_float) << 8;
+            samples_data[i*CHANNEL_NUM + 10] = ((int) triangle_float) << 8;
+            samples_data[i*CHANNEL_NUM + 11] = ((int) sin_float) << 8;
+            samples_data[i*CHANNEL_NUM + 12] = ((int) triangle_float) << 8;
+            samples_data[i*CHANNEL_NUM + 13] = ((int) sin_float) << 8;
+            samples_data[i*CHANNEL_NUM + 14] = ((int) triangle_float) << 8;
+            samples_data[i*CHANNEL_NUM + 15] = ((int) sin_float) << 8;
+#endif
         } else {
             samples_data[i*CHANNEL_NUM] = ((int) triangle_float);
             samples_data[i*CHANNEL_NUM + 1] = ((int) sin_float);
-#if CHANNEL_NUM == 8
+#if CHANNEL_NUM > 2
             samples_data[i*CHANNEL_NUM + 2] = ((int) triangle_float);
             samples_data[i*CHANNEL_NUM + 3] = ((int) sin_float);
+#endif
+#if CHANNEL_NUM > 4
             samples_data[i*CHANNEL_NUM + 4] = ((int) triangle_float);
             samples_data[i*CHANNEL_NUM + 5] = ((int) sin_float);
             samples_data[i*CHANNEL_NUM + 6] = ((int) triangle_float);
             samples_data[i*CHANNEL_NUM + 7] = ((int) sin_float);
+#endif
+#if CHANNEL_NUM > 8
+            samples_data[i*CHANNEL_NUM + 8] = ((int) triangle_float);
+            samples_data[i*CHANNEL_NUM + 9] = ((int) sin_float);
+            samples_data[i*CHANNEL_NUM + 10] = ((int) triangle_float);
+            samples_data[i*CHANNEL_NUM + 11] = ((int) sin_float);
+            samples_data[i*CHANNEL_NUM + 12] = ((int) triangle_float);
+            samples_data[i*CHANNEL_NUM + 13] = ((int) sin_float);
+            samples_data[i*CHANNEL_NUM + 14] = ((int) triangle_float);
+            samples_data[i*CHANNEL_NUM + 15] = ((int) sin_float);
 #endif
         }
 
