@@ -35,7 +35,7 @@
 #define SAMPLE_RATE     (44100) // number of audio frames per second
 #define SAMPLE_WIDTH    (24)    // width in bits of each sample (16, 24, 32)
 #define CHANNEL_WIDTH   (32)    // width in bits of each channel (16, 24, 32); typically "24-bit" TDM is still 32 bits wide
-#define CHANNEL_NUM     (8)     // number of channels in each frame (4, 8, 16)
+#define CHANNEL_NUM     (4)     // number of channels in each frame (4, 8, 16)
 
 #define TEST_DATA       (1)     // 0: triangle/sine wave in L/R pairs
                                 // 1: sample data is hardcoded to a specific value per channel
@@ -75,27 +75,25 @@ static void setup_channel_test_values(int bits)
 
     for(i = 0; i < FRAMES_PER_CYCLE; i++)
     {
-        /* align so that channel 1 has the leftmost bit high and the rest low, channel 2 has the second bit from the left high and the rest low, etc. */
+        /* align so that channel 1 has the leftmost bit high and the rest low, channel 2 has the second two bits from the left high and the rest low, etc. */
         if (bits == 16)
         {
             /* stuff two samples into a single 32-bit int */
-            unsigned int shiftbase = bits - CHANNEL_NUM;
             for (int j = 0; j < CHANNEL_NUM; j += 2)
             {
-                unsigned int sample_val = (short)1 << (CHANNEL_NUM - j + shiftbase);
+                unsigned int sample_val = ~((short)0xFFFF >> j);
                 sample_val = sample_val << 16;
-                sample_val += (short) 1 << (CHANNEL_NUM - (j+1) + shiftbase);
+                sample_val += ~((short) 0xFFFF >> (j+1));
                 samples_data[i*CHANNEL_NUM + j] = sample_val;
             }
         }
         else
         {
             /* lower 8 bits are unused for 24-bit, but it's still the same 32 bits of data being written to i2s driver either way */
-            unsigned int shiftbase = 32 - CHANNEL_NUM;
             for (int j = 0; j < CHANNEL_NUM; j += 2)
             {
-                samples_data[i*CHANNEL_NUM + j] = ((int)1 << (CHANNEL_NUM - j + shiftbase));
-                samples_data[i*CHANNEL_NUM + j + 1] = ((int)1 << (CHANNEL_NUM - (j+1) + shiftbase));
+                samples_data[i*CHANNEL_NUM + j] = ~((int)0xFFFFFFFF >> (j));
+                samples_data[i*CHANNEL_NUM + j + 1] = ~((int)0xFFFFFFFF >> (j+1));
             }
         }
     }
