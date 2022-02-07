@@ -37,6 +37,9 @@
 #define CHANNEL_WIDTH   (32)    // width in bits of each channel (16, 24, 32); typically "24-bit" TDM is still 32 bits wide
 #define CHANNEL_NUM     (8)     // number of channels in each frame (4, 8, 16)
 
+#define TEST_DATA       (1)     // 0: triangle/sine wave in L/R pairs
+                                // 1: sample data is hardcoded to a specific value per channel
+
 #define WAVE_FREQ_HZ    (100)
 
 /* End modifiable parameters. The rest of the defines are derived from the above */
@@ -58,6 +61,51 @@
 #define PI              (3.14159265)
 
 static const char* TAG = "tdm_example";
+
+static void setup_channel_test_values(int bits)
+{
+    int *samples_data = malloc(FRAMES_PER_CYCLE*BYTES_PER_FRAME);
+    unsigned int i;
+    double sin_float, triangle_float, triangle_step = (double) pow(2, bits) / FRAMES_PER_CYCLE;
+    size_t i2s_bytes_write = 0;
+
+    printf("\r\nTest bits=%d free mem=%d, written data=%d\n", bits, esp_get_free_heap_size(), FRAMES_PER_CYCLE*BYTES_PER_FRAME);
+
+    triangle_float = -(pow(2, bits)/2 - 1);
+
+    for(i = 0; i < FRAMES_PER_CYCLE; i++)
+    {
+        /* align so that channel 1 has the leftmost bit high and the rest low, channel 2 has the second bit from the left high and the rest low, etc. */
+        unsigned int shiftbase = bits - CHANNEL_NUM;
+        if (bits == 16)
+        {
+            /* stuff two samples into a single 32-bit int */
+            for (int j = 0; j < CHANNEL_NUM; j += 2)
+            {
+                unsigned int sample_val = (short)1 << (CHANNEL_NUM - j + shiftbase);
+                sample_val = sample_val << 16;
+                sample_val += (short) 1 << (CHANNEL_NUM - (j+1) + shiftbase);
+                samples_data[i*CHANNEL_NUM + j] = sample_val;
+            }
+        }
+        else
+        {
+            /* lower 8 bits are unused for 24-bit, but it's still the same 32 bits of data being written to i2s driver either way */
+            for (int j = 0; j < CHANNEL_NUM; j += 2)
+            {
+                samples_data[i*CHANNEL_NUM + j] = ((int)1 << (CHANNEL_NUM - j + shiftbase));
+                samples_data[i*CHANNEL_NUM + j + 1] = ((int)1 << (CHANNEL_NUM - (j+1) + shiftbase));
+            }
+        }
+    }
+    ESP_LOGI(TAG, "set clock");
+    i2s_set_clk(I2S_NUM, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
+
+    ESP_LOGI(TAG, "write data");
+    i2s_write(I2S_NUM, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+
+    free(samples_data);
+}
 
 static void setup_triangle_sine_waves(int bits)
 {
@@ -128,7 +176,8 @@ void app_main(void)
         .bits_per_chan = CHANNEL_WIDTH,
         .chan_mask = CHANNEL_MASK,
         .channel_format = I2S_CHANNEL_FMT_MULTIPLE,
-        .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+        .communication_format = I2S_COMM_FORMAT_PCM_LONG,
+        .mclk_multiple = 512, // must be at least 512 so bck divider is at least 2
         .dma_buf_count = 3,
         .dma_buf_len = 147,
 //        .dma_desc_num = 3,
@@ -149,7 +198,11 @@ void app_main(void)
     int test_bits = SAMPLE_WIDTH;
     while (1)
     {
+#if TEST_DATA == 0
         setup_triangle_sine_waves(test_bits);
+#else
+        setup_channel_test_values(test_bits);
+#endif
         vTaskDelay(5000/portTICK_RATE_MS);
     }
 
