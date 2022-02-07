@@ -81,7 +81,7 @@ static void setup_channel_test_values(int bits)
             /* stuff two samples into a single 32-bit int */
             for (int j = 0; j < CHANNEL_NUM; j += 2)
             {
-                unsigned int sample_val = ~((short)0xFFFF >> j+1);
+                unsigned int sample_val = ~((short)0xFFFF >> (j+1));
                 sample_val = sample_val << 16;
                 sample_val += ~((short) 0xFFFF >> (j+2));
                 samples_data[i*CHANNEL_NUM + j] = sample_val;
