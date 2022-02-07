@@ -76,10 +76,10 @@ static void setup_channel_test_values(int bits)
     for(i = 0; i < FRAMES_PER_CYCLE; i++)
     {
         /* align so that channel 1 has the leftmost bit high and the rest low, channel 2 has the second bit from the left high and the rest low, etc. */
-        unsigned int shiftbase = bits - CHANNEL_NUM;
         if (bits == 16)
         {
             /* stuff two samples into a single 32-bit int */
+            unsigned int shiftbase = bits - CHANNEL_NUM;
             for (int j = 0; j < CHANNEL_NUM; j += 2)
             {
                 unsigned int sample_val = (short)1 << (CHANNEL_NUM - j + shiftbase);
@@ -91,6 +91,7 @@ static void setup_channel_test_values(int bits)
         else
         {
             /* lower 8 bits are unused for 24-bit, but it's still the same 32 bits of data being written to i2s driver either way */
+            unsigned int shiftbase = 32 - CHANNEL_NUM;
             for (int j = 0; j < CHANNEL_NUM; j += 2)
             {
                 samples_data[i*CHANNEL_NUM + j] = ((int)1 << (CHANNEL_NUM - j + shiftbase));
@@ -176,7 +177,7 @@ void app_main(void)
         .bits_per_chan = CHANNEL_WIDTH,
         .chan_mask = CHANNEL_MASK,
         .channel_format = I2S_CHANNEL_FMT_MULTIPLE,
-        .communication_format = I2S_COMM_FORMAT_PCM_LONG,
+        .communication_format = I2S_COMM_FORMAT_PCM_SHORT, // must be PCM_SHORT now, i guess?
         .mclk_multiple = 512, // must be at least 512 so bck divider is at least 2
         .dma_buf_count = 3,
         .dma_buf_len = 147,
