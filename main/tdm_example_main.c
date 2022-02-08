@@ -23,24 +23,28 @@
 
 /* Define IOs and peripheral number */
 
-#define I2S_NUM         (0)
-#define I2S_MCK_IO      (GPIO_NUM_5)
-#define I2S_BCK_IO      (GPIO_NUM_6)
-#define I2S_WS_IO       (GPIO_NUM_4)
-#define I2S_DO_IO       (GPIO_NUM_7)
-#define I2S_DI_IO       (-1)
+#define I2S0_MCK_IO     (GPIO_NUM_5)
+#define I2S0_BCK_IO     (GPIO_NUM_6)
+#define I2S0_WS_IO      (GPIO_NUM_4)
+#define I2S0_DO_IO      (GPIO_NUM_7)
+#define I2S0_DI_IO      (-1)
+
+#define I2S1_BCK_IO     (GPIO_NUM_41)
+#define I2S1_WS_IO      (GPIO_NUM_42)
+#define I2S1_DO_IO      (GPIO_NUM_40)
+#define I2S1_DI_IO      (-1)
 
 /* Begin modifiable parameters */
 
 #define SAMPLE_RATE     (44100) // number of audio frames per second
-#define SAMPLE_WIDTH    (24)    // width in bits of each sample (16, 24, 32)
+#define SAMPLE_WIDTH    (32)    // width in bits of each sample (16, 24, 32)
 #define CHANNEL_WIDTH   (32)    // width in bits of each channel (16, 24, 32); typically "24-bit" TDM is still 32 bits wide
 #define CHANNEL_NUM     (4)     // number of channels in each frame (4, 8, 16)
 
 #define TEST_DATA       (1)     // 0: triangle/sine wave in L/R pairs
                                 // 1: sample data is hardcoded to a specific value per channel
 
-#define WAVE_FREQ_HZ    (100)
+#define WAVE_FREQ_HZ    (100)   // if TEST_DATA is 0
 
 /* End modifiable parameters. The rest of the defines are derived from the above */
 
@@ -66,12 +70,9 @@ static void setup_channel_test_values(int bits)
 {
     int *samples_data = malloc(FRAMES_PER_CYCLE*BYTES_PER_FRAME);
     unsigned int i;
-    double sin_float, triangle_float, triangle_step = (double) pow(2, bits) / FRAMES_PER_CYCLE;
     size_t i2s_bytes_write = 0;
 
     printf("\r\nTest bits=%d free mem=%d, written data=%d\n", bits, esp_get_free_heap_size(), FRAMES_PER_CYCLE*BYTES_PER_FRAME);
-
-    triangle_float = -(pow(2, bits)/2 - 1);
 
     for(i = 0; i < FRAMES_PER_CYCLE; i++)
     {
@@ -98,10 +99,13 @@ static void setup_channel_test_values(int bits)
         }
     }
     ESP_LOGI(TAG, "set clock");
-    i2s_set_clk(I2S_NUM, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
+    i2s_set_clk(0, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
 
     ESP_LOGI(TAG, "write data");
-    i2s_write(I2S_NUM, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    i2s_write(0, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_LOGI(TAG, "wrote %d to i2s 0", i2s_bytes_write);
+    i2s_write(1, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_LOGI(TAG, "wrote %d to i2s 1", i2s_bytes_write);
 
     free(samples_data);
 }
@@ -158,17 +162,20 @@ static void setup_triangle_sine_waves(int bits)
 
     }
     ESP_LOGI(TAG, "set clock");
-    i2s_set_clk(I2S_NUM, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
+    i2s_set_clk(0, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
 
     ESP_LOGI(TAG, "write data");
-    i2s_write(I2S_NUM, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    i2s_write(0, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_LOGI(TAG, "wrote %d to i2s 0", i2s_bytes_write);
+    i2s_write(1, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_LOGI(TAG, "wrote %d to i2s 1", i2s_bytes_write);
 
     free(samples_data);
 }
 
 void app_main(void)
 {
-    i2s_config_t i2s_config = {
+    i2s_config_t i2s0_config = {
         .mode = I2S_MODE_MASTER | I2S_MODE_TX,
         .sample_rate = SAMPLE_RATE,
         .bits_per_sample = SAMPLE_WIDTH,
@@ -184,15 +191,39 @@ void app_main(void)
         .use_apll = false,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1                                //Interrupt level 1
     };
-    i2s_pin_config_t pin_config = {
-        .mck_io_num = I2S_MCK_IO,
-        .bck_io_num = I2S_BCK_IO,
-        .ws_io_num = I2S_WS_IO,
-        .data_out_num = I2S_DO_IO,
-        .data_in_num = I2S_DI_IO                                               //Not used
+    i2s_config_t i2s1_config = {
+        .mode = I2S_MODE_SLAVE | I2S_MODE_TX,
+        .sample_rate = SAMPLE_RATE,
+        .bits_per_sample = SAMPLE_WIDTH,
+        .bits_per_chan = CHANNEL_WIDTH,
+        .chan_mask = CHANNEL_MASK,
+        .channel_format = I2S_CHANNEL_FMT_MULTIPLE,
+        .communication_format = I2S_COMM_FORMAT_PCM_SHORT, // must be PCM_SHORT now, i guess?
+        .mclk_multiple = 512, // must be at least 512 so bck divider is at least 2
+        .dma_buf_count = 3,
+        .dma_buf_len = 147,
+//        .dma_desc_num = 3,
+//        .dma_frame_num = 147,
+        .use_apll = false,
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1                                //Interrupt level 1
     };
-    i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_NUM, &pin_config);
+    i2s_pin_config_t i2s0_pin_config = {
+        .mck_io_num = I2S0_MCK_IO,
+        .bck_io_num = I2S0_BCK_IO,
+        .ws_io_num = I2S0_WS_IO,
+        .data_out_num = I2S0_DO_IO,
+        .data_in_num = I2S0_DI_IO                                               //Not used
+    };
+    i2s_pin_config_t i2s1_pin_config = {
+        .bck_io_num = I2S1_BCK_IO,
+        .ws_io_num = I2S1_WS_IO,
+        .data_out_num = I2S1_DO_IO,
+        .data_in_num = I2S1_DI_IO                                               //Not used
+    };
+    i2s_driver_install(0, &i2s0_config, 0, NULL);
+    i2s_set_pin(0, &i2s0_pin_config);
+    i2s_driver_install(1, &i2s1_config, 0, NULL);
+    i2s_set_pin(1, &i2s1_pin_config);
 
     int test_bits = SAMPLE_WIDTH;
     while (1)
@@ -202,6 +233,7 @@ void app_main(void)
 #else
         setup_channel_test_values(test_bits);
 #endif
+        ESP_LOGI(TAG, "See you again in 5 seconds");
         vTaskDelay(5000/portTICK_RATE_MS);
     }
 
