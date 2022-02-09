@@ -13,8 +13,10 @@
 #include "freertos/task.h"
 #include "driver/i2s.h"
 #include "driver/gpio.h"
+#include "esp_rom_gpio.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "hal/i2s_hal.h"
 #include <math.h>
 
 #if !SOC_I2S_SUPPORTS_TDM
@@ -29,8 +31,9 @@
 #define I2S0_DO_IO      (GPIO_NUM_7)
 #define I2S0_DI_IO      (-1)
 
-#define I2S1_BCK_IO     (GPIO_NUM_41)
-#define I2S1_WS_IO      (GPIO_NUM_42)
+/* BCK and WS use the same pins as I2S0 and are hooked up internally to the other I2S peripheral through the matrix after setting the pin config */
+#define I2S1_BCK_IO     (GPIO_NUM_6)
+#define I2S1_WS_IO      (GPIO_NUM_4)
 #define I2S1_DO_IO      (GPIO_NUM_40)
 #define I2S1_DI_IO      (-1)
 
@@ -102,9 +105,9 @@ static void setup_channel_test_values(int bits)
     i2s_set_clk(0, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
 
     ESP_LOGI(TAG, "write data");
-    i2s_write(0, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2s_write(0, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100));
     ESP_LOGI(TAG, "wrote %d to i2s 0", i2s_bytes_write);
-    i2s_write(1, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2s_write(1, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100));
     ESP_LOGI(TAG, "wrote %d to i2s 1", i2s_bytes_write);
 
     free(samples_data);
@@ -220,10 +223,18 @@ void app_main(void)
         .data_out_num = I2S1_DO_IO,
         .data_in_num = I2S1_DI_IO                                               //Not used
     };
+
     i2s_driver_install(0, &i2s0_config, 0, NULL);
     i2s_set_pin(0, &i2s0_pin_config);
     i2s_driver_install(1, &i2s1_config, 0, NULL);
     i2s_set_pin(1, &i2s1_pin_config);
+
+    /* Connnect BCLK signals together */
+    esp_rom_gpio_connect_out_signal(I2S0_BCK_IO, i2s_periph_signal[0].m_tx_bck_sig, 0, 0);
+    esp_rom_gpio_connect_in_signal(I2S1_BCK_IO, i2s_periph_signal[1].s_rx_bck_sig, 0);
+    /* Connect WS signals together */
+    esp_rom_gpio_connect_out_signal(I2S0_WS_IO, i2s_periph_signal[0].m_tx_ws_sig, 0, 0);
+    esp_rom_gpio_connect_in_signal(I2S1_WS_IO, i2s_periph_signal[1].s_rx_ws_sig, 0);
 
     int test_bits = SAMPLE_WIDTH;
     while (1)
