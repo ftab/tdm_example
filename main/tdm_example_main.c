@@ -164,9 +164,6 @@ static void setup_triangle_sine_waves(int bits)
         }
 
     }
-    ESP_LOGI(TAG, "set clock");
-    i2s_set_clk(0, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
-    i2s_set_clk(1, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | bits, CHANNEL_MASK);
 
     ESP_LOGI(TAG, "write data");
     i2s_write(0, samples_data, FRAMES_PER_CYCLE*BYTES_PER_FRAME, &i2s_bytes_write, 100);
@@ -236,6 +233,10 @@ void app_main(void)
     /* Connect WS signals together */
     esp_rom_gpio_connect_out_signal(I2S0_WS_IO, i2s_periph_signal[0].m_tx_ws_sig, 0, 0);
     esp_rom_gpio_connect_in_signal(I2S1_WS_IO, i2s_periph_signal[1].s_rx_ws_sig, 0);
+
+    ESP_LOGI(TAG, "set clock");
+    i2s_set_clk(0, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | SAMPLE_WIDTH, CHANNEL_MASK);
+    i2s_set_clk(1, SAMPLE_RATE, (CHANNEL_WIDTH << 16) | SAMPLE_WIDTH, CHANNEL_MASK);
 
     int test_bits = SAMPLE_WIDTH;
     while (1)
